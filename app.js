@@ -18,9 +18,11 @@ var menuComponent = Vue.extend({
        showView: function (e, id) {
            e.preventDefault();
 
-           this.$parent.activedView = id;
+           this.$dispatch('change-activedview', id);
+
            if (id == 1) {
-               this.$parent.formType = 'insert';
+               //this.$parent.formType = 'insert';
+               this.$dispatch('change-formType', 'insert')
            }
 
        },
@@ -86,9 +88,9 @@ var billListComponent = Vue.extend({
 
             e.preventDefault();
 
-            this.$parent.bill = bill;
-            this.$parent.activedView = 1;
-            this.$parent.formType = 'update';
+            this.$dispatch('change-bill', bill);
+            this.$dispatch('change-activedview', 1);
+            this.$dispatch('change-formType', 'update')
         },
         remove: function (e, bill) {
 
@@ -104,6 +106,22 @@ var billListComponent = Vue.extend({
 
             this.$parent.activedView = 0;
 
+        },
+    },
+    events: {
+        "new-bill": function (bill) {
+            this.bills.push(bill);
+        }
+    },
+    filters: {
+        status: function (value) {
+            var status;
+            if (value === false) {
+                status = 'Não'
+            } else {
+                status = 'Sim'
+            }
+            return status;
         },
     }
 
@@ -129,9 +147,9 @@ var billCreateComponent = Vue.extend({
             <input type="button" value="Enviar" v-on:click="submit($event)">
         </form> 
    `,
-   props:['bill', 'formType'],
    data: function () {
        return {
+           formType: 'insert',
            names: [
                'Luz',
                'Água',
@@ -141,6 +159,13 @@ var billCreateComponent = Vue.extend({
                'Empréstimo',
                'Gasolina',
            ],
+           bill: {
+               date_due: '',
+               name: '',
+               value: 0,
+               done: false,
+           },
+
        }
    },
    methods:{
@@ -149,7 +174,8 @@ var billCreateComponent = Vue.extend({
            e.preventDefault();
 
            if (this.formType == 'insert') {
-               this.$parent.$children[1].bills.push(this.bill);
+               //this.$parent.$refs.billListComponent.bills.push(this.bill);
+               this.$dispatch('new-bill', this.bill)
            }
 
            this.bill = {
@@ -159,9 +185,17 @@ var billCreateComponent = Vue.extend({
                done: false,
            }
 
-           this.$parent.activedView = 0;
+           this.$dispatch('change-activedview', 0);
        },
 
+   },
+   events:{
+       "change-formType": function (formType) {
+           this.formType = formType;
+       },
+       "change-bill": function (bill) {
+           this.bill = bill;
+       },
    }
 
 });
@@ -187,38 +221,35 @@ var appComponent = Vue.extend({
     <menu-component></menu-component>
     
     <div v-show="activedView == 0">
-         <bill-list-component></bill-list-component>
+         <bill-list-component v-ref:bill-list-component></bill-list-component>
     </div>
     
     <div v-show="activedView == 1">
-        <bill-create-component :bill.sync="bill" :form-type="formType"></bill-create-component>
+        <bill-create-component :bill.sync="bill"></bill-create-component>
     </div>
     `,
     data: function() {
         return {
             title: 'Contas a pagar',
             statusCliente: '',
-            formType: 'insert',
             activedView: 0,
-            bill: {
-                date_due: '',
-                name: '',
-                value: 0,
-                done: false,
-            },
 
         }
     },
     computed: {
                 status: function () {
 
+
+                    var billListComponent = this.$refs.billListComponent;
+
+                    if (!billListComponent.bills.length) {
+                        return false;
+                    }
+
                     var count = 0;
 
-                    if (!this.bills.length)
-                        return false;
-
-                    for (var i in this.bills) {
-                        if (!this.bills[i].done) {
+                    for (var i in billListComponent.bills) {
+                        if (!billListComponent.bills[i].done) {
                             count++;
                         }
                     }
@@ -231,40 +262,45 @@ var appComponent = Vue.extend({
 
 
     },
+    events: {
+        "change-activedview": function (activedView) {
+            this.activedView = activedView;
+        },
+        "change-formType": function (formType) {
+            this.$broadcast('change-formType', formType);
+        },
+        "change-bill": function (bill) {
+            this.$broadcast('change-bill', bill);
+        },
+        "new-bill": function (bill) {
+            this.$broadcast('new-bill', bill);
+        }
+    },
     filters: {
-                status: function (value) {
-                    var status;
-                    if (value === false) {
-                        status = 'Não'
-                    } else {
-                        status = 'Sim'
-                    }
-                    return status;
-                },
-                statusCliente: function (value) {
-                    var status;
+        statusCliente: function (value) {
+            var status;
 
-                    if (value === false) {
-                        status = 'Nenhuma conta cadastrada';
-                        this.statusCliente = 0;
-                        console.log(this.statusCliente);
-                    }
+            if (value === false) {
+                status = 'Nenhuma conta cadastrada';
+                this.statusCliente = 0;
+                console.log(this.statusCliente);
+            }
 
-                    if (value === 0) {
-                        status = 'Nenhuma conta a pagar';
-                        this.statusCliente = 1;
-                        console.log(this.statusCliente);
+            if (value === 0) {
+                status = 'Nenhuma conta a pagar';
+                this.statusCliente = 1;
+                console.log(this.statusCliente);
 
-                    }
+            }
 
-                    if (value > 0) {
-                        status = 'Existem ' + value + ' contas a serem pagas';
-                        this.statusCliente = 2;
-                        console.log(this.statusCliente);
-                    }
+            if (value > 0) {
+                status = 'Existem ' + value + ' contas a serem pagas';
+                this.statusCliente = 2;
+                console.log(this.statusCliente);
+            }
 
-                    return status;
-                }
+            return status;
+        }
     }
 });
 
